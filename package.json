@@ -7,8 +7,11 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
     "moment": "^2.29.3",
     "moment-random": "^1.1.0",
-    "mongoose": "^8.9.7"
+    "mongoose": "^8.9.7",
+    "morgan": "^1.10.0"
   }
 }
