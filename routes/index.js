@@ -21,7 +21,6 @@ router.get('/trips/:departure?/:arrival?/:date?', async function(req, res, next)
   try {
     const { departure, arrival, date } = req.params;
   
-    // Construire la requête de manière conditionnelle en fonction des paramètres fournis
     let query = {};
 
     if (departure) {
@@ -47,7 +46,7 @@ router.get('/trips/:departure?/:arrival?/:date?', async function(req, res, next)
     const data = await Trip.find(query);
 
     if (data.length === 0) {
-      return res.status(404).json({ message: 'Pas de trajet trouvé pour ces critères.' });
+      return res.status(404).json({ message: 'Pas de trajet trouvé pour ces critères.', imagePath: 'images/notfound.png' });
     }
 
     res.json({ result: true, trip: data });
@@ -55,9 +54,6 @@ router.get('/trips/:departure?/:arrival?/:date?', async function(req, res, next)
     res.status(500).json({ message: error.message });
   }
 });
-
-
-
 
 
 module.exports = router;

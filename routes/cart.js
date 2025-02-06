@@ -1,50 +1,84 @@
 const express = require('express');
 const router = express.Router();
+const Cart = require('../models/card');
 const Trip = require('../models/trip');
+const Booking = require('../models/bookings');
 
-// Route pour obtenir tous les trajets du panier
-router.get('/cart', (req, res) => {
-    console.log("on teste sur le get ")
-    console.log(req.session);
-    const cart = req.session.cart || []; // on utilise la session pour le panier
-    
-    if (cart.length === 0) {
-        return res.status(200).json({ message: 'Votre panier est vide.' }); // Message explicite si le panier est vide
-    }
-
-    res.json(cart); // Retourne le panier
-});
-
-// Route pour ajouter un trajet au panier
+// Ajouter un trajet au panier
 router.post('/cart/add', async (req, res) => {
-    const { tripId } = req.body;
-    console.log(req.body);
     try {
-        // Cherche le trajet à ajouter au panier
-        const trip = await Trip.findById(tripId);
-        if (trip) {
-            // Ajoute le trajet au panier (dans la session)
-            if (!req.session.cart) req.session.cart = [];
-            req.session.cart.push(trip);
-            console.log("on teste sur le post");
-            console.log(req.session);
-            return res.status(200).json({ message: 'Trajet ajouté au panier - On est good cote backend' });
-        } else {
-            return res.status(404).json({ message: 'Trajet introuvable' });
+        const { tripId } = req.body;
+
+        if (!tripId) {
+            return res.status(400).json({ message: 'Trip ID requis' });
         }
+
+        const trip = await Trip.findById(tripId);
+        if (!trip) {
+            return res.status(404).json({ message: 'Trip non trouvé' });
+        }
+        // Vérifier si le trajet est déjà dans le panier
+        const existingCartItem = await Cart.findOne({ trip: tripId });
+        if (existingCartItem) {
+            return res.status(400).json({ message: 'Ce trajet est déjà dans le panier' });
+        }
+
+        const newCartItem = new Cart({ trip: tripId });
+        await newCartItem.save();
+
+        res.json({ result: true, message: 'Trajet ajouté au panier' });
     } catch (error) {
-        return res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 });
 
-// Route pour supprimer un trajet du panier
-router.delete('/cart/remove', (req, res) => {
-    const { tripId } = req.body;
-    const cart = req.session.cart || [];
+// Afficher tous les trajets du panier
+router.get('/cart', async (req, res) => {
+    try {
+        const cartItems = await Cart.find().populate('trip');
+        res.json({ result: true, cart: cartItems });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
-    // Trouve et supprime le trajet du panier
-    req.session.cart = cart.filter(trip => trip._id.toString() !== tripId);
-    res.status(200).json({ message: 'Trajet supprimé du panier' });
+// Supprimer un trajet du panier
+router.delete('/cart/delete/:id', async (req, res) => {
+    try {
+        const cartItem = await Cart.findByIdAndDelete(req.params.id);
+        if (!cartItem) {
+            return res.status(404).json({ message: 'Trajet non trouvé dans le panier' });
+        }
+
+        res.json({ result: true, message: 'Trajet supprimé du panier' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+router.post('/cart/pay/:id', async (req, res) => {
+    try {
+        const cartItem = await Cart.findById(req.params.id).populate('trip');
+        if (!cartItem) {
+            return res.status(404).json({ message: "Trajet non trouvé dans le panier" });
+        }
+
+        const existingBooking = await Booking.findOne({ trip: cartItem.trip._id });
+        if (existingBooking) {
+            return res.status(400).json({ message: "Ce trajet est déjà réservé" });
+        }
+
+        // Marquer l'élément comme payé et l'ajouter aux réservations
+        const newBooking = new Booking({ trip: cartItem.trip });
+        await newBooking.save();
+
+        // Supprimer l'élément du panier
+        await Cart.findByIdAndDelete(req.params.id);
+
+        res.json({ result: true, message: "Trajet payé et ajouté aux réservations" });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 module.exports = router;
